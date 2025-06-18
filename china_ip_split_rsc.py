@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import requests
 import ipaddress
 import os
@@ -14,9 +15,7 @@ APNIC_URL = "https://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"
 CHNROUTE_URL = "https://raw.githubusercontent.com/ruijzhan/chnroute/master/CN.rsc"
 APNIC_FILE = "delegated-apnic-latest"
 CHNROUTE_FILE = "CN.rsc"
-DEFAULT_SPLIT_SIZE = 1500  # 默认拆分条目数
-LIST_NAME_PREFIX = "ChinaIp_"
-SINGLE_LIST_NAME = "ChinaIp"
+LIST_NAME = "ChinaIp"
 OUTPUT_FILE = "china_ip_list.rsc"
 DEFAULT_SRC_ADDRESS_LIST = "lan_IP"
 DEFAULT_ROUTING_MARK = "GF_R"
@@ -103,8 +102,8 @@ def parse_chnroute_data(data):
                     logger.warning(f"chnroute 中无效 CIDR：{cidr}")
     return sorted(set(china_ips))
 
-def write_rsc(china_ips, split, split_size, list_name_prefix, add_mangle, src_address_list, routing_mark):
-    """生成单个 .rsc 文件，支持拆分或单一列表，无备注，mangle 规则在最下方"""
+def write_rsc(china_ips, add_mangle, src_address_list, routing_mark):
+    """生成单个 .rsc 文件，使用单一 ChinaIp 列表，无备注，mangle 规则在最下方"""
     total_ips = len(china_ips)
     logger.info(f"总中国 IP 条目数：{total_ips}")
     if total_ips == 0:
@@ -116,53 +115,25 @@ def write_rsc(china_ips, split, split_size, list_name_prefix, add_mangle, src_ad
     with open(filename, 'w', encoding='utf-8') as f:
         # 写入地址列表
         f.write("/ip firewall address-list\n")
-        if split:
-            # 拆分模式
-            list_names = []
-            for i in range(0, total_ips, split_size):
-                chunk = china_ips[i:i + split_size]
-                list_name = f"{list_name_prefix}{i//split_size + 1}"
-                list_names.append(list_name)
-                for ip in chunk:
-                    f.write(f"add list={list_name} address={ip}\n")
-                logger.info(f"添加 {len(chunk)} 条到列表 {list_name}")
-        else:
-            # 不拆分模式
-            list_names = [SINGLE_LIST_NAME]
-            for ip in china_ips:
-                f.write(f"add list={SINGLE_LIST_NAME} address={ip}\n")
-            logger.info(f"添加 {total_ips} 条到列表 {SINGLE_LIST_NAME}")
+        for ip in china_ips:
+            f.write(f"add list={LIST_NAME} address={ip}\n")
+        logger.info(f"添加 {total_ips} 条到列表 {LIST_NAME}")
 
         # 写入 mangle 规则（若启用）
         if add_mangle:
             f.write("/ip firewall mangle\n")
-            if split:
-                # 拆分模式：passthrough=yes + 最终 accept
-                for list_name in list_names:
-                    f.write(f"add chain=prerouting action=mark-routing new-routing-mark={routing_mark} passthrough=yes src-address-list={src_address_list} dst-address-list=!{list_name}\n")
-                f.write(f"add chain=prerouting action=accept passthrough=no src-address-list={src_address_list}\n")
-                logger.info(f"添加 {len(list_names)} 条 mangle 规则和 1 条接受规则，src-address-list={src_address_list}, routing-mark={routing_mark}")
-            else:
-                # 不拆分模式：单一规则，passthrough=no
-                f.write(f"add chain=prerouting action=mark-routing new-routing-mark={routing_mark} passthrough=no src-address-list={src_address_list} dst-address-list=!{SINGLE_LIST_NAME}\n")
-                logger.info(f"添加 1 条 mangle 规则，src-address-list={src_address_list}, routing-mark={routing_mark}")
+            f.write(f"add chain=prerouting action=mark-routing new-routing-mark={routing_mark} passthrough=no src-address-list={src_address_list} dst-address-list=!{LIST_NAME}\n")
+            logger.info(f"添加 1 条 mangle 规则，src-address-list={src_address_list}, routing-mark={routing_mark}")
 
-    logger.info(f"生成 {filename}，包含 {total_ips} 条，{'拆分为 %d 个列表' % (total_ips//split_size + 1) if split else '单一 %s 列表' % SINGLE_LIST_NAME}{'，含 mangle 规则' if add_mangle else ''}")
+    logger.info(f"生成 {filename}，包含 {total_ips} 条，单一 {LIST_NAME} 列表{'，含 mangle 规则' if add_mangle else ''}")
 
 def main():
     """主函数"""
     # 解析命令行参数
-    parser = argparse.ArgumentParser(description="下载并生成中国 IP 列表为 RouterOS .rsc 文件，支持拆分或单一列表")
-    parser.add_argument('--split', action='store_true', help='启用地址列表拆分（默认不拆分）')
-    parser.add_argument('--split-size', type=int, default=DEFAULT_SPLIT_SIZE, help='拆分模式下每个地址列表的 IP 条目数（默认 1500，仅在 --split 时生效）')
+    parser = argparse.ArgumentParser(description="下载中国 IP 列表并生成 RouterOS .rsc 文件")
     parser.add_argument('--src-address-list', default=DEFAULT_SRC_ADDRESS_LIST, help='mangle 规则的 src-address-list（默认 lan_IP）')
     parser.add_argument('--routing-mark', default=DEFAULT_ROUTING_MARK, help='mangle 规则的 new-routing-mark（默认 GF_R）')
     args = parser.parse_args()
-
-    # 验证 split_size
-    if args.split and args.split_size <= 0:
-        logger.error("split-size 必须为正整数")
-        return
 
     # 检查本地 APNIC 文件
     data = None
@@ -193,7 +164,7 @@ def main():
     add_mangle = prompt_for_mangle()
 
     # 生成 .rsc 文件
-    write_rsc(china_ips, args.split, args.split_size, LIST_NAME_PREFIX, add_mangle, args.src_address_list, args.routing_mark)
+    write_rsc(china_ips, add_mangle, args.src_address_list, args.routing_mark)
 
 if __name__ == "__main__":
     main()
