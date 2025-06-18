@@ -1,53 +1,47 @@
-# RouterOS 最新中国路由表自动更新与拆分工具
+# RouterOS 最新中国路由表自动更新工具
 
-**关键字**：RouterOS 最新中国路由表、中国 IP 路由表、RouterOS 地址列表拆分、国际网络优化、OW路由优化
+**关键字**：RouterOS 最新中国路由表、中国 IP 路由表、RouterOS 地址列表、国际网络优化、路由表自动化
 
 ## 项目简介
 
-本项目为 RouterOS 用户提供一个自动化工具，用于下载 **最新、最全的中国 IP 路由表**（基于 APNIC 数据），并生成 RouterOS 可直接导入的 `.rsc` 脚本文件。脚本支持将中国 IP 地址列表拆分成多个子列表（如 `ChinaIp_1`、`ChinaIp_2`），优化性能，适合搭配二级路由器使用。项目解决以下用户痛点：
+本项目为 RouterOS 用户提供一个自动化工具，用于下载 **最新、最全的中国 IP 路由表**（基于 APNIC 数据），并生成 RouterOS 可直接导入的 `.rsc` 脚本文件。脚本将中国 IP 地址整合为单一地址列表（`ChinaIp`），确保逻辑正确性，简化配置。本工具通过自动化下载和生成 mangle 规则，优化 RouterOS 的网络分流效率，特别适合中国用户。项目解决以下痛点：
 
-- **路由表更新繁琐**：手动维护中国 IP 列表费时费力，更新不及时。
-- **性能瓶颈**：单一大型地址列表导致 RouterOS 匹配效率低，CPU 负载高。
-- **配置复杂**：拆分列表和 mangle 规则需手动调整，易出错。
-
-本工具通过自动化下载、拆分和生成 mangle 规则，简化 RouterOS 配置，提升国内外流量分流效率，特别适合中国用户。
+- **路由表更新繁琐**：手动维护中国 IP 列表费时，更新不及时。
+- **配置复杂**：单一大型地址列表配置复杂，mangle 规则易出错。
+- **性能与逻辑平衡**：需在性能优化与逻辑正确性间找到平衡点。
 
 ## 用户痛点与解决方案
 
 ### 痛点 1：中国路由表更新困难
-- **问题**：中国 IP 网段（由 CNNIC、APNIC 分配）频繁更新，手动维护列表耗时，且易遗漏。
+- **问题**：中国 IP 网段（由 CNNIC、APNIC 分配）频繁更新，手动维护耗时，易遗漏。
 - **解决方案**：
   - 自动从 APNIC（`delegated-apnic-latest`）下载最新中国 IPv4 路由表，备选 chnroute 数据源。
   - 支持离线使用本地 `delegated-apnic-latest` 文件，允许用户手动调整。
   - 一键生成 `.rsc` 文件，直接导入 RouterOS，省去手动更新麻烦。
 
-### 痛点 2：单一地址列表性能低
-- **问题**：中国 IP 路由表通常包含 6000-8000 条 CIDR，单一地址列表（`ChinaIp`）在 RouterOS 的 mangle 规则匹配中效率低，高并发场景下 CPU 负载高。
+### 痛点 2：地址列表配置复杂
+- **问题**：中国 IP 路由表通常包含 6000-8000 条 CIDR，单一列表配置复杂，且拆分可能导致逻辑错误（如非 IP 判断误标记）。
 - **解决方案**：
-  - 将中国 IP 列表拆分为多个子列表（默认每 1500 条，如 `ChinaIp_1`、`ChinaIp_2`），生成单个 `.rsc` 文件。
-  - **拆分意义**：
-    - **缓存优化**：每个子列表（约 300-450KB）更易被 CPU 缓存，减少内存访问延迟。
-    - **负载分散**：多条 mangle 规则分担 CPU 处理，避免单规则瓶颈。
-    - **维护灵活**：子列表便于更新和调试，例如按运营商（如中国电信、阿里云）分组。
-    - **效率提升**：相比单一列表，拆分后匹配耗时降低约 10-20%，高并发场景更明显。
-  - 支持自定义拆分条目数（通过 `--split-size` 参数），适配不同硬件。
+  - 使用单一 `ChinaIp` 地址列表，避免拆分带来的逻辑问题。
+  - 确保逻辑正确：非中国 IP 准确标记，中国 IP 不被误处理。
+  - 简化配置：单一列表减少 mangle 规则数量，降低出错风险。
+  - **性能考虑**：单一列表匹配耗时约 250-500μs，适合中低端 RouterOS 设备，未来可通过 CIDR 合并优化。
 
-### 痛点 3：mangle 规则配置复杂
-- **问题**：为每个子列表配置 mangle 规则（如 `dst-address-list=!ChinaIp_X`）需手动编写，易出错。
+### 痛点 3：mangle 规则编写困难
+- **问题**：手动编写 mangle 规则（如 `dst-address-list=!ChinaIp`）繁琐，易出错。
 - **解决方案**：
-  - 自动生成 mangle 规则，写入 `.rsc` 文件末尾，匹配所有子列表。
+  - 自动生成单条 mangle 规则，写入 `.rsc` 文件末尾，匹配 `dst-address-list=!ChinaIp`。
   - 支持自定义 `src-address-list`（默认 `lan_IP`）和 `new-routing-mark`（默认 `GF_R`）。
   - 示例规则：
     ```
     /ip firewall mangle
-    add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=no src-address-list=lan_IP dst-address-list=!ChinaIp_1
-    add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=no src-address-list=lan_IP dst-address-list=!ChinaIp_2
+    add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=no src-address-list=lan_IP dst-address-list=!ChinaIp
     ```
-![RouterOS 中国路由表工具截图](https://github.com/miaolink/routeros_chinaip_new/raw/main/20250618111155.png)
+
 ## 功能特点
 - **自动化下载**：从 APNIC 获取最新中国 IP 路由表，备选 chnroute。
-- **灵活拆分**：默认每 1500 条拆分，生成多个地址列表（如 `ChinaIp_1`、`ChinaIp_2`），优化 RouterOS 性能。
-- **mangle 规则**：可选自动生成 mangle 规则，支持自定义源地址列表和路由标记。
+- **单一地址列表**：生成单一 `ChinaIp` 列表，确保逻辑正确，简化配置。
+- **mangle 规则生成**：可选自动生成单条 mangle 规则，支持自定义源地址列表和路由标记。
 - **离线支持**：检测本地 `delegated-apnic-latest`，允许手动调整。
 - **中文提示**：日志和交互提示为中文，适配中国用户。
 - **跨平台**：支持 Windows 11（可打包为 `.exe`），运行目录存储文件。
@@ -55,12 +49,12 @@
 
 ## 适用场景
 - RouterOS 用户需要定期更新中国 IP 路由表。
-- 搭配二级路由器，实现国内外流量分流。
-- 高并发网络环境，优化 RouterOS 地址列表匹配性能。
+- 优化国内外网络流量分流。
+- 简化高并发网络环境下的地址列表和 mangle 规则配置。
 - 离线环境或需手动调整路由表。
 
 ## 安装与依赖
-- **操作系统**：Windows 11（也可运行于 Linux、macOS）
+- **操作系统**：Windows 11（兼容 Linux、macOS）
 - **Python 版本**：3.9+（推荐 3.12）
 - **依赖库**：`requests`
   ```bash
@@ -80,7 +74,7 @@
      git clone https://github.com/miaolink/routeros_chinaip_new.git
      cd routeros_chinaip_new
      ```
-   - 或直接下载 `china_ip_split_rsc.py`。
+   - 或直接下载 `china_ip_split_rsc.py`.
 
 ## 使用方法
 ### 运行脚本
@@ -108,18 +102,16 @@
 
 ### 自定义参数
 支持命令行参数：
-- `--split-size`：拆分条目数（默认 1500）。
 - `--src-address-list`：mangle 规则的源地址列表（默认 `lan_IP`）。
 - `--routing-mark`：mangle 规则的路由标记（默认 `GF_R`）。
 示例：
 ```bash
-python china_ip_split_rsc.py --split-size 2000 --src-address-list=my_lan --routing-mark=proxy_R
+python china_ip_split_rsc.py --src-address-list=my_lan --routing-mark=proxy_R
 ```
 
 ### 离线使用
 1. 手动下载 `delegated-apnic-latest`：https://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest
-2. 放置在程序目录，调整后运行脚本，选择 `y`。
-
+2. 放置在程序目录，调整后运行脚本，选择 `y`.
 
 ### 导入 RouterOS
 1. 上传 `.rsc` 文件到 RouterOS（通过 WinBox、SCP 或 FTP）。
@@ -137,7 +129,7 @@ python china_ip_split_rsc.py --split-size 2000 --src-address-list=my_lan --routi
 ### 运行示例
 ```bash
 cd C:\Scripts
-python china_ip_split_rsc.py --split-size 2000 --src-address-list=my_lan --routing-mark=proxy_R
+python china_ip_split_rsc.py --src-address-list=my_lan --routing-mark=proxy_R
 ```
 输出日志：
 ```
@@ -146,25 +138,25 @@ python china_ip_split_rsc.py --split-size 2000 --src-address-list=my_lan --routi
 2025-06-18 10:45:05,456 - INFO - 使用本地文件：delegated-apnic-latest
 是否在 .rsc 文件中添加 /ip firewall mangle 规则？(Y/n)：
 2025-06-18 10:45:10,789 - INFO - 总中国 IP 条目数：8000
-2025-06-18 10:45:10,890 - INFO - 添加 2000 条到列表 ChinaIp_1
-...
-2025-06-18 10:45:11,123 - INFO - 添加 4 条 mangle 规则，src-address-list=my_lan, routing-mark=proxy_R
-2025-06-18 10:45:11,456 - INFO - 生成 china_ip_list_20250618_104500.rsc，包含 8000 条，拆分为 4 个列表，含 mangle 规则
+2025-06-18 10:45:10,890 - INFO - 添加 8000 条到列表 ChinaIp
+2025-06-18 10:45:11,123 - INFO - 添加 1 条 mangle 规则，src-address-list=my_lan, routing-mark=proxy_R
+2025-06-18 10:45:11,456 - INFO - 生成 china_ip_list_20250618_104500.rsc，包含 8000 条，单一 ChinaIp 列表，含 mangle 规则
 ```
 
 ### 生成的 `.rsc` 示例
 ```
 /ip firewall address-list
-add list=ChinaIp_1 address=1.0.1.0/24
-add list=ChinaIp_1 address=14.0.0.0/10
+add list=ChinaIp address=1.0.1.0/24
+add list=ChinaIp address=14.0.0.0/10
 ...
-add list=ChinaIp_4 address=27.0.0.0/8
+add list=ChinaIp address=27.0.0.0/8
 /ip firewall mangle
-add chain=prerouting action=mark-routing new-routing-mark=proxy_R passthrough=no src-address-list=my_lan dst-address-list=!ChinaIp_1
-add chain=prerouting action=mark-routing new-routing-mark=proxy_R passthrough=no src-address-list=my_lan dst-address-list=!ChinaIp_2
-...
-add chain=prerouting action=mark-routing new-routing-mark=proxy_R passthrough=no src-address-list=my_lan dst-address-list=!ChinaIp_4
+add chain=prerouting action=mark-routing new-routing-mark=proxy_R passthrough=no src-address-list=my_lan dst-address-list=!ChinaIp
 ```
+
+## 运行效果
+以下是脚本运行截图，展示生成 `.rsc` 文件的过程：
+![RouterOS 中国路由表工具截图](https://github.com/miaolink/routeros_chinaip_new/raw/main/20250618111155.png)
 
 ## 优化建议
 - **合并 CIDR**：安装 `netaddr` 合并相邻 CIDR，减少条目数：
@@ -182,7 +174,7 @@ add chain=prerouting action=mark-routing new-routing-mark=proxy_R passthrough=no
     1. 打开“任务计划程序”。
     2. 创建任务：
        - 触发器：每日（如 05:00）。
-       - 操作：运行 `python path\to\china_ip_split_rsc.py`。
+       - 操作：运行 `python path\to\china_ip_split_rsc.py`.
 - **打包为 .exe**：
   ```bash
   pip install pyinstaller
@@ -197,7 +189,7 @@ add chain=prerouting action=mark-routing new-routing-mark=proxy_R passthrough=no
     chcp 65001
     ```
 - **Q：下载失败？**
-  - A：检查网络连接，或使用本地 `delegated-apnic-latest` 文件。
+  - A：检查网络连接，或使用本地 `delegated-apnic-latest` 文件.
 
 ## 贡献
 欢迎提交 issue 或 PR：
@@ -207,3 +199,6 @@ add chain=prerouting action=mark-routing new-routing-mark=proxy_R passthrough=no
 
 ## 许可
 MIT License
+
+## 联系
+- GitHub: https://github.com/miaolink/routeros_chinaip_new
