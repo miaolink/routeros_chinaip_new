@@ -1,0 +1,10 @@
+python china_ip_split_rsc.py --split-size 2000
+或
+python china_ip_split_rsc.py
+
+或:
+china_ip_split_rsc.exe
+或:
+china_ip_split_rsc.exe--split-size 2000
+
+任用!
