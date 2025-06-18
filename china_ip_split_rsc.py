@@ -4,6 +4,7 @@ import ipaddress
 import os
 import logging
 import argparse
+import sys
 from datetime import datetime
 
 # 配置日志（中文提示）
@@ -21,8 +22,13 @@ DEFAULT_SRC_ADDRESS_LIST = "lan_IP"
 DEFAULT_ROUTING_MARK = "GF_R"
 
 def get_script_dir():
-    """获取程序运行目录"""
-    return os.path.dirname(os.path.abspath(__file__))
+    """获取程序运行目录，适配 PyInstaller 单文件模式"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller 单文件模式，返回 .exe 所在目录
+        return os.path.dirname(sys.executable)
+    else:
+        # .py 模式，返回脚本所在目录
+        return os.path.dirname(os.path.abspath(__file__))
 
 def prompt_use_local_file(filename):
     """提示用户是否使用本地文件，默认否"""
@@ -52,7 +58,7 @@ def read_local_file(filename):
     try:
         with open(os.path.join(get_script_dir(), filename), 'r', encoding='utf-8') as f:
             return f.read()
-    except Exception as e:
+    except (PermissionError, IOError) as e:
         logger.error(f"读取本地文件 {filename} 失败：{e}")
         return None
 
@@ -61,12 +67,16 @@ def download_file(url, filename):
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
-        with open(os.path.join(get_script_dir(), filename), 'w', encoding='utf-8') as f:
+        filepath = os.path.join(get_script_dir(), filename)
+        with open(filepath, 'w', encoding='utf-8') as f:
             f.write(response.text)
-        logger.info(f"从 {url} 下载到 {filename}")
+        logger.info(f"从 {url} 下载到 {filepath}")
         return response.text
     except requests.RequestException as e:
         logger.error(f"下载 {url} 失败：{e}")
+        return None
+    except (PermissionError, IOError) as e:
+        logger.error(f"写入文件 {filename} 失败：{e}")
         return None
 
 def parse_apnic_data(data):
@@ -112,20 +122,22 @@ def write_rsc(china_ips, add_mangle, src_address_list, routing_mark):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = os.path.join(get_script_dir(), f"{OUTPUT_FILE.replace('.rsc', f'_{timestamp}.rsc')}")
-    with open(filename, 'w', encoding='utf-8') as f:
-        # 写入地址列表
-        f.write("/ip firewall address-list\n")
-        for ip in china_ips:
-            f.write(f"add list={LIST_NAME} address={ip}\n")
-        logger.info(f"添加 {total_ips} 条到列表 {LIST_NAME}")
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            # 写入地址列表
+            f.write("/ip firewall address-list\n")
+            for ip in china_ips:
+                f.write(f"add list={LIST_NAME} address={ip}\n")
+            logger.info(f"添加 {total_ips} 条到列表 {LIST_NAME}")
 
-        # 写入 mangle 规则（若启用）
-        if add_mangle:
-            f.write("/ip firewall mangle\n")
-            f.write(f"add chain=prerouting action=mark-routing new-routing-mark={routing_mark} passthrough=no src-address-list={src_address_list} dst-address-list=!{LIST_NAME}\n")
-            logger.info(f"添加 1 条 mangle 规则，src-address-list={src_address_list}, routing-mark={routing_mark}")
-
-    logger.info(f"生成 {filename}，包含 {total_ips} 条，单一 {LIST_NAME} 列表{'，含 mangle 规则' if add_mangle else ''}")
+            # 写入 mangle 规则（若启用）
+            if add_mangle:
+                f.write("/ip firewall mangle\n")
+                f.write(f"add chain=prerouting action=mark-routing new-routing-mark={routing_mark} passthrough=no src-address-list={src_address_list} dst-address-list=!{LIST_NAME}\n")
+                logger.info(f"添加 1 条 mangle 规则，src-address-list={src_address_list}, routing-mark={routing_mark}")
+        logger.info(f"生成 {filename}，包含 {total_ips} 条，单一 {LIST_NAME} 列表{'，含 mangle 规则' if add_mangle else ''}")
+    except (PermissionError, IOError) as e:
+        logger.error(f"写入文件 {filename} 失败：{e}")
 
 def main():
     """主函数"""
