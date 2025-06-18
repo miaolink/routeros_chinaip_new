@@ -8690,9 +8690,9 @@ add list=ChinaIp_6 address=81.68.0.0/14
 add list=ChinaIp_6 address=82.156.0.0/15
 add list=ChinaIp_6 address=94.191.0.0/17
 /ip firewall mangle
-add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=no src-address-list=lan_IP dst-address-list=!ChinaIp_1
-add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=no src-address-list=lan_IP dst-address-list=!ChinaIp_2
-add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=no src-address-list=lan_IP dst-address-list=!ChinaIp_3
-add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=no src-address-list=lan_IP dst-address-list=!ChinaIp_4
-add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=no src-address-list=lan_IP dst-address-list=!ChinaIp_5
-add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=no src-address-list=lan_IP dst-address-list=!ChinaIp_6
+add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=yes src-address-list=lan_IP dst-address-list=!ChinaIp_1
+add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=yes src-address-list=lan_IP dst-address-list=!ChinaIp_2
+add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=yes src-address-list=lan_IP dst-address-list=!ChinaIp_3
+add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=yes src-address-list=lan_IP dst-address-list=!ChinaIp_4
+add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=yes src-address-list=lan_IP dst-address-list=!ChinaIp_5
+add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=yes src-address-list=lan_IP dst-address-list=!ChinaIp_6
