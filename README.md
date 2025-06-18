@@ -77,8 +77,8 @@
 3. 下载本项目：
    - 克隆仓库：
      ```bash
-     git clone https://github.com/<your-username>/china-ip-split-rsc.git
-     cd china-ip-split-rsc
+     git clone https://github.com/miaolink/routeros_chinaip_new.git
+     cd routeros_chinaip_new
      ```
    - 或直接下载 `china_ip_split_rsc.py`。
 
