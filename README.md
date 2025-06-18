@@ -198,13 +198,6 @@ add chain=prerouting action=mark-routing new-routing-mark=proxy_R passthrough=no
     ```
 - **Q：下载失败？**
   - A：检查网络连接，或使用本地 `delegated-apnic-latest` 文件。
-- **Q：LAN 侧 Web 访问失败？**
-  - A：确保 OpenWrt 防火墙允许 80/443，并配置 Mihomo 绕过：
-    ```bash
-    uci add_list openclash.bypass='198.18.20.20'
-    uci commit openclash
-    /etc/init.d/openclash restart
-    ```
 
 ## 贡献
 欢迎提交 issue 或 PR：
