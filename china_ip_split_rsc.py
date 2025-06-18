@@ -129,7 +129,8 @@ def write_rsc(china_ips, split_size, list_name_prefix, add_mangle, src_address_l
             f.write("/ip firewall mangle\n")
             for list_name in list_names:
                 f.write(f"add chain=prerouting action=mark-routing new-routing-mark={routing_mark} passthrough=yes src-address-list={src_address_list} dst-address-list=!{list_name}\n")
-            logger.info(f"添加 {len(list_names)} 条 mangle 规则，src-address-list={src_address_list}, routing-mark={routing_mark}")
+            f.write(f"add chain=prerouting action=accept passthrough=no src-address-list={src_address_list}\n")
+            logger.info(f"添加 {len(list_names)} 条 mangle 规则和 1 条接受规则，src-address-list={src_address_list}, routing-mark={routing_mark}")
 
     logger.info(f"生成 {filename}，包含 {total_ips} 条，拆分为 {total_ips//split_size + 1} 个列表{'，含 mangle 规则' if add_mangle else ''}")
 
