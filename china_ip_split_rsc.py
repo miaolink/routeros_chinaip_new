@@ -137,10 +137,15 @@ def main():
     """主函数"""
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="下载并拆分中国 IP 列表为单个 RouterOS .rsc 文件")
-    parser.add_argument('--split-size', type=int, default=DEFAULT_SPLIT_SIZE, help='每个地址列表的 IP 条目数')
-    parser.add_argument('--src-address-list', default=DEFAULT_SRC_ADDRESS_LIST, help='mangle 规则的 src-address-list')
-    parser.add_argument('--routing-mark', default=DEFAULT_ROUTING_MARK, help='mangle 规则的 new-routing-mark')
+    parser.add_argument('--split-size', type=int, default=DEFAULT_SPLIT_SIZE, help='每个地址列表的 IP 条目数（默认 1500）')
+    parser.add_argument('--src-address-list', default=DEFAULT_SRC_ADDRESS_LIST, help='mangle 规则的 src-address-list（默认 lan_IP）')
+    parser.add_argument('--routing-mark', default=DEFAULT_ROUTING_MARK, help='mangle 规则的 new-routing-mark（默认 GF_R）')
     args = parser.parse_args()
+
+    # 验证 split_size
+    if args.split_size <= 0:
+        logger.error("split-size 必须为正整数")
+        return
 
     # 检查本地 APNIC 文件
     data = None
