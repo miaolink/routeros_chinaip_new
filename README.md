@@ -43,7 +43,7 @@
     add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=no src-address-list=lan_IP dst-address-list=!ChinaIp_1
     add chain=prerouting action=mark-routing new-routing-mark=GF_R passthrough=no src-address-list=lan_IP dst-address-list=!ChinaIp_2
     ```
-
+![RouterOS 中国路由表工具截图](https://github.com/miaolink/routeros_chinaip_new/raw/main/20250618111155.png)
 ## 功能特点
 - **自动化下载**：从 APNIC 获取最新中国 IP 路由表，备选 chnroute。
 - **灵活拆分**：默认每 1500 条拆分，生成多个地址列表（如 `ChinaIp_1`、`ChinaIp_2`），优化 RouterOS 性能。
@@ -119,6 +119,7 @@ python china_ip_split_rsc.py --split-size 2000 --src-address-list=my_lan --routi
 ### 离线使用
 1. 手动下载 `delegated-apnic-latest`：https://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest
 2. 放置在程序目录，调整后运行脚本，选择 `y`。
+
 
 ### 导入 RouterOS
 1. 上传 `.rsc` 文件到 RouterOS（通过 WinBox、SCP 或 FTP）。
