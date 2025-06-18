@@ -1,6 +1,6 @@
 # RouterOS 最新中国路由表自动更新与拆分工具
 
-**关键字**：RouterOS 最新中国路由表、中国 IP 路由表、RouterOS 地址列表拆分、国际网络优化、OpenWrt 路由优化
+**关键字**：RouterOS 最新中国路由表、中国 IP 路由表、RouterOS 地址列表拆分、国际网络优化、OW路由优化
 
 ## 项目简介
 
